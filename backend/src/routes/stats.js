@@ -3,21 +3,30 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const DATA_PATH = path.join(__dirname, '../../data/items.json');
+const { mean } = require('../utils/stats');
+
+let averagePrice = undefined;
+let lastStoredTotalCount = 0;
 
 // GET /api/stats
-router.get('/', (req, res, next) => {
-  fs.readFile(DATA_PATH, (err, raw) => {
-    if (err) return next(err);
-
+router.get('/', async (req, res, next) => {
+  try {
+    const data = await fs.promises.readFile(DATA_PATH);
     const items = JSON.parse(raw);
     // Intentional heavy CPU calculation
+    if (averagePrice === undefined || items.length !== lastStoredTotalCount) {
+      averagePrice = mean(items.map(item => item.price));
+      lastStoredTotalCount = items.length;
+    }
     const stats = {
-      total: items.length,
-      averagePrice: items.reduce((acc, cur) => acc + cur.price, 0) / items.length
+      total: lastStoredTotalCount,
+      averagePrice: averagePrice,
     };
 
     res.json(stats);
-  });
+  } catch (err) {
+    return next(err);
+  }
 });
 
 module.exports = router;
